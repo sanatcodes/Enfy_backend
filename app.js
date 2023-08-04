@@ -18,8 +18,8 @@ app.use(upload.none());
 const rateLimit = require("express-rate-limit");
 
 const imageGenLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // limit each IP to 20 requests per windowMs
+  windowMs: 24 * 60 * 60 * 1000, // 15 minutes
+  max: 12, // limit each IP to 20 requests per windowMs
   message: "Too many image requests from this IP, please try again later.",
 });
 
@@ -69,6 +69,49 @@ app.post("/fetch-images", imageGenLimiter, async (req, res) => {
     );
 
     // Set the response headers and send the image data
+    res.set("Content-Type", "image/png");
+    res.send(response.data); // Send the ArrayBuffer directly
+  } catch (error) {
+    console.error(error);
+    res.status(500).send("Error generating image");
+  }
+});
+
+app.post("/dezgo-generate-image", imageGenLimiter, async (req, res) => {
+  try {
+    const { prompt } = req.body;
+
+    const formData = new FormData();
+    formData.append("lora2_strength", ".7");
+    formData.append("lora2", "");
+    formData.append("lora1_strength", ".7");
+    formData.append("prompt", prompt);
+    formData.append("width", "512");
+    formData.append("height", "512");
+    formData.append("steps", "30");
+    formData.append("sampler", "dpmpp_2m_karras");
+    formData.append("model", "dreamshaper_7");
+    formData.append(
+      "negative_prompt",
+      "ugly, tiling, poorly drawn hands, poorly drawn feet, poorly drawn face, out of frame, extra limbs, disfigured, deformed, body out of frame, blurry, bad anatomy, blurred, watermark, grainy, signature, cut off, draft"
+    );
+    formData.append("upscale", "1");
+    formData.append("seed", "");
+    formData.append("guidance", "7");
+    formData.append("lora1", "");
+
+    const response = await axios.post(
+      "https://api.dezgo.com/text2image",
+      formData,
+      {
+        headers: {
+          ...formData.getHeaders(),
+          "X-Dezgo-Key": process.env.DEZGO_API_KEY,
+        },
+        responseType: "arraybuffer",
+      }
+    );
+
     res.set("Content-Type", "image/png");
     res.send(response.data); // Send the ArrayBuffer directly
   } catch (error) {
