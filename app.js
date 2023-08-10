@@ -4,6 +4,7 @@ const cors = require("cors");
 const FormData = require("form-data");
 require("dotenv").config();
 const multer = require("multer");
+const bodyParser = require("body-parser");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -14,6 +15,8 @@ app.use(cors());
 
 const upload = multer();
 app.use(upload.none());
+
+app.use(bodyParser.json());
 
 const rateLimit = require("express-rate-limit");
 
@@ -73,11 +76,15 @@ app.post("/fetch-images", imageGenLimiter, async (req, res) => {
     res.send(response.data); // Send the ArrayBuffer directly
   } catch (error) {
     console.error(error);
+    if (error.response && error.response.status === 402) {
+      console.log("Out of ClipDrop credits.");
+      return res.status(402).send("Out of ClipDrop credits.");
+    }
     res.status(500).send("Error generating image");
   }
 });
 
-app.post("/dezgo-generate-image", imageGenLimiter, async (req, res) => {
+app.post("/dezgo-generate-image", async (req, res) => {
   try {
     const { prompt } = req.body;
 
@@ -118,6 +125,48 @@ app.post("/dezgo-generate-image", imageGenLimiter, async (req, res) => {
     console.error(error);
     res.status(500).send("Error generating image");
   }
+});
+
+app.post("/createOrder", (req, res) => {
+  // Extract parameters from the request body
+  const { OrderId, CustomerId, items, shippingAddress } = req.body;
+
+  // Use the API key from the environment variables
+  const apiKey = process.env.GELATO_API_KEY;
+
+  // Define headers
+  let headers = {
+    "Content-Type": "application/json",
+    "X-API-KEY": apiKey,
+  };
+
+  // Set up order request
+  let orderUrl = "https://order.gelatoapis.com/v4/orders";
+  let orderJson = {
+    orderType: "order",
+    orderReferenceId: OrderId,
+    customerReferenceId: CustomerId,
+    currency: "USD",
+    items: items,
+    shipmentMethodUid: "express",
+    shippingAddress: shippingAddress,
+  };
+
+  // Send order request
+  request.post(
+    {
+      url: orderUrl,
+      headers: headers,
+      body: JSON.stringify(orderJson),
+    },
+    function (error, res, body) {
+      if (error) {
+        res.status(500).json({ error: "Failed to place order." });
+        return;
+      }
+      res.json(JSON.parse(body));
+    }
+  );
 });
 
 app.listen(PORT, () => {
