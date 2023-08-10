@@ -84,6 +84,7 @@ app.post("/fetch-images", imageGenLimiter, async (req, res) => {
   }
 });
 
+// generte image from dezgo
 app.post("/dezgo-generate-image", async (req, res) => {
   try {
     const { prompt } = req.body;
