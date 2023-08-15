@@ -52,6 +52,7 @@ app.get("/get-price/:productUUID", async (req, res) => {
   }
 });
 
+// add rate limiting when in production
 app.post("/fetch-images", imageGenLimiter, async (req, res) => {
   try {
     const promptText = req.body.prompt;
@@ -168,6 +169,69 @@ app.post("/createOrder", (req, res) => {
       res.json(JSON.parse(body));
     }
   );
+});
+
+app.post("/getMockup", async (req, res) => {
+  const { product, imgUrl } = req.body;
+
+  const url = "https://api.mediamodifier.com/v2/mockup/render";
+
+  const headers = {
+    api_key: process.env.MEDIA_MODIFIER_API_KEY,
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+
+  let payload;
+
+  switch (product) {
+    case "t-shirt":
+      payload = {
+        nr: 520,
+        layer_inputs: [
+          {
+            id: "juqu6evm8k4dtcu835p",
+            data: imgUrl,
+            crop: {
+              x: 50,
+              y: 0,
+              width: 512,
+              height: 512,
+            },
+            checked: true,
+          },
+          {
+            id: "juqu6evngbz3cjyh7sj",
+            checked: true,
+            color: {
+              red: 0,
+              green: 0,
+              blue: 0,
+            },
+          },
+        ],
+      };
+      break;
+    // Add cases for 'poster' and 'canvas' here...
+
+    default:
+      return res.status(400).send({ error: "Invalid product type" });
+  }
+
+  try {
+    const response = await axios.post(url, payload, { headers: headers });
+
+    if (response.status !== 200) {
+      throw new Error(
+        `Failed to fetch from MediaModifier: ${response.statusText}`
+      );
+    }
+
+    return res.json(response.data.url);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send({ error: error.message });
+  }
 });
 
 app.listen(PORT, () => {
