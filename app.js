@@ -234,6 +234,35 @@ app.post("/getMockup", async (req, res) => {
   }
 });
 
+app.get("/api/images", async (req, res) => {
+  try {
+    const response = await fetch("https://lexica.art/api/v1/search");
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: "Error fetching images", error: error.message });
+  }
+});
+
+app.get("/api/images/:theme", async (req, res) => {
+  const theme = req.params.theme;
+  try {
+    const response = await axios.get(
+      `https://lexica.art/api/v1/search?q=${theme}`
+    );
+    res.json(response.data);
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        message: `Error fetching images for theme: ${theme}`,
+        error: error.message,
+      });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
