@@ -5,19 +5,17 @@ const FormData = require("form-data");
 require("dotenv").config();
 const multer = require("multer");
 const bodyParser = require("body-parser");
-
 const app = express();
 const PORT = process.env.PORT || 4000;
+const OpenAI = require("openai");
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 app.use(express.json());
-
 app.use(cors());
-
 const upload = multer();
 app.use(upload.none());
-
 app.use(bodyParser.json());
-
 const rateLimit = require("express-rate-limit");
 
 const imageGenLimiter = rateLimit({
@@ -254,12 +252,46 @@ app.get("/api/images/:theme", async (req, res) => {
     );
     res.json(response.data);
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: `Error fetching images for theme: ${theme}`,
-        error: error.message,
-      });
+    res.status(500).json({
+      message: `Error fetching images for theme: ${theme}`,
+      error: error.message,
+    });
+  }
+});
+
+app.post("/promptGenerator", async (req, res) => {
+  const userMessage = req.body.message;
+
+  if (!userMessage) {
+    return res.status(400).json({ message: "Prompt is required" });
+  }
+
+  try {
+    const response = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content:
+            'You are now operating in "Image Prompt Enhancement assistant" for stable diffusion. Your primary mission is to assist users in formulating detailed and evocative prompts specifically designed for image generation using stable diffusion. \n\nYou will be provided with a general and vague description of an image in the form of a prompt, and your task is to create a prompt with that input, using these techniques below and provide only the output in JSON format.\n\nTechniques for prompt generation:\n\nStart with a Base Description: This is the primary subject or theme of the image.\n\nExample: "A serene mountain landscape."\nAdd Specific Details: Dive deeper into the elements that make up the base description.\n\nExample: "Snow-capped peaks, a clear blue sky with a few wispy clouds, and a dense pine forest at the mountain base."\nIncorporate Sensory Elements: Describe the ambiance, the time of day, or any other sensory details.\n\nExample: "The early morning sun casts a golden hue on the mountain tops, and there\'s a gentle mist rising from the valleys."\nIntroduce Dynamic Elements: Add elements that suggest movement or change.\n\nExample: "A flock of birds takes flight from the treetops, and there\'s a gentle ripple in a mountain lake reflecting the sky."\n\nHere is an example:\n\ninput: snoopdog as a ninja turtle\n\noutput: {\n  "prompt": "Generate an image of Snoop Dogg transformed into a Ninja Turtle, wearing a sleek green shell, with signature gold chains and sunglasses. The city\'s neon lights reflect off his shell, creating a cool ambiance around him. He strikes a confident pose, microphone in one hand and a nunchaku in the other, ready to perform on a rooftop, using stable diffusion."\n}',
+        },
+        {
+          role: "user",
+          content: userMessage,
+        },
+      ],
+      model: "gpt-3.5-turbo",
+      temperature: 1,
+      max_tokens: 256,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+    });
+
+    const promptValue = response.choices[0].message.content.prompt;
+    res.send(promptValue); // send only the prompt value
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "An error occurred" });
   }
 });
 
